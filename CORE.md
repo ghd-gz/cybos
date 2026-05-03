@@ -55,6 +55,6 @@ while space.variety > epsilon:
 
 | Phase | 内容 | 状态 |
 |---|---|---|
-| 1 | Tool Layer 标准化——带控制论元数据的工具调用协议 | ← 当前 |
-| 2 | Space 原语实现 + 轻量运行时核心 | |
-| 3 | Agent + SOUL 集成 | |
+| 1 | Tool Layer 标准化——带控制论元数据的工具调用协议 | ✅ 已完成 |
+| 2 | Epiplexity 估计集成——Space 交叉耦合度、Survey 子系统、升级 Ashby 定律 | ✅ 已完成 |
+| 3 | Agent + SOUL 深度集成 | ⏳ 待推进 |
