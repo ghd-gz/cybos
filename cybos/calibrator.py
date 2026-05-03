@@ -142,11 +142,11 @@ class Calibrator:
         group_analysis = {}
         for level, recs in groups.items():
             errors = [r.prediction_error for r in recs]
-            conv_rate = sum(1 for r in recs if r.converged) / len(recs)
-            avg_steps = sum(r.steps for r in recs) / len(recs)
+            conv_rate = sum(1 for r in recs if r.converged) / len(recs) if recs else 0
+            avg_steps = sum(r.steps for r in recs) / len(recs) if recs else 0
             group_analysis[level] = {
                 "count": len(recs),
-                "avg_error": round(sum(errors) / len(errors), 4),
+                "avg_error": round(sum(errors) / len(errors), 4) if errors else 0,
                 "errors": [round(e, 4) for e in errors],
                 "convergence_rate": round(conv_rate, 2),
                 "avg_steps": round(avg_steps, 1),

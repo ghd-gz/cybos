@@ -211,6 +211,7 @@ class Constraint:
     """控制动作（约束）。
     
     对应 Layer 1 协议中的 Tool Call + control 元数据。
+    depends_on: 依赖的前序约束ID（形成收敛路径）。
     """
     
     def __init__(
@@ -221,6 +222,7 @@ class Constraint:
         from_space: Optional[str] = None,
         expected_reduction: float = 0.3,
         sequence: int = 1,
+        depends_on: Optional[str] = None,
     ):
         self.name = name
         self.args = args
@@ -228,6 +230,7 @@ class Constraint:
         self.from_space = from_space or "unknown"
         self.expected_reduction = max(0.0, min(0.99, expected_reduction))
         self.sequence = sequence
+        self.depends_on = depends_on  # B: 依赖的前序约束ID
     
     @staticmethod
     def _generate_id() -> str:
@@ -243,6 +246,7 @@ class Constraint:
                 "from_space": self.from_space,
                 "expected_variety_reduction": self.expected_reduction,
                 "sequence": self.sequence,
+                "depends_on": self.depends_on,  # B
             },
         }
     
@@ -254,6 +258,8 @@ class Observation:
     """观测结果。
     
     对应 Layer 1 协议中的 Tool Output。
+    variety_reduction: 观测确认的实际变异度降低 [0,1]（A: 观测驱动更新）
+                       为 None 时 fallback 到 constraint.expected_reduction
     """
     
     def __init__(
@@ -262,11 +268,13 @@ class Observation:
         data: Any,
         exit_code: int = 0,
         execution_ms: float = 0,
+        variety_reduction: Optional[float] = None,
     ):
         self.constraint_id = constraint_id
         self.data = data
         self.exit_code = exit_code
         self.execution_ms = execution_ms
+        self.variety_reduction = variety_reduction  # A: 观测的实际收敛量
         self.state_signature = self._compute_signature(data)
     
     @staticmethod
@@ -285,6 +293,7 @@ class Observation:
             },
             "observation": self.data,
             "state_signature": self.state_signature,
+            "variety_reduction": self.variety_reduction,  # A
         }
     
     def __repr__(self) -> str:

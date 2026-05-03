@@ -58,25 +58,28 @@ class CybosSession:
     # ── 执行 ──
 
     def constrain(self, name: str, args: dict,
-                  expected_reduction: float = 0.3) -> Constraint:
+                  expected_reduction: float = 0.3,
+                  depends_on: Optional[str] = None) -> Constraint:
         """创建一个约束（工具调用前调用）。
         
-        返回含 constraint_id 的 Constraint 对象，
-        后续可关联观测结果。
+        depends_on: B — 依赖的前序约束ID。
         """
-        return self.runtime.constrain(name, args, expected_reduction)
+        return self.runtime.constrain(name, args, expected_reduction,
+                                       depends_on=depends_on)
 
     def observe(self, constraint: Constraint, data: Any,
-                exit_code: int = 0) -> Space:
+                exit_code: int = 0,
+                variety_reduction: Optional[float] = None) -> Space:
         """记录观测结果（工具调用后调用）。
         
-        返回更新后的 Space（含新的 variety 和 epiplexity）。
+        variety_reduction: A — 实际收敛量，None则用expected_reduction。
         """
         self.step_count += 1
         obs = Observation(
             constraint_id=constraint.constraint_id,
             data=data,
             exit_code=exit_code,
+            variety_reduction=variety_reduction,
         )
         new_space = self.runtime.step(constraint, obs)
         self._constraints.append(constraint)

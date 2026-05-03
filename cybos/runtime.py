@@ -105,8 +105,12 @@ class Runtime:
         self._current_space = space
         return space
     
-    def constrain(self, name: str, args: dict, expected_reduction: float = 0.3) -> Constraint:
-        """创建一个控制动作（不执行，只生成协议对象）。"""
+    def constrain(self, name: str, args: dict, expected_reduction: float = 0.3,
+                  depends_on: Optional[str] = None) -> Constraint:
+        """创建一个控制动作（不执行，只生成协议对象）。
+        
+        depends_on: B — 依赖的前序约束ID，形成收敛路径。
+        """
         self._sequence += 1
         space = self.poss_space()
         
@@ -116,6 +120,7 @@ class Runtime:
             from_space=space.space_id,
             expected_reduction=expected_reduction,
             sequence=self._sequence,
+            depends_on=depends_on,
         )
         return constraint
     
@@ -228,18 +233,45 @@ class Runtime:
     def step(self, constraint: Constraint, observation: Observation) -> Space:
         """执行一个控制步。
         
-        1. 用观测结果更新当前空间（variety + epiplexity）
-        2. 计算误差
-        3. 记录轨迹
+        A: variety 更新优先使用 observation.variety_reduction，
+           其次是 constraint.expected_reduction。
+        B: 检查依赖链——如果依赖的约束未执行，标记依赖失败。
         """
-        # 计算实际变异度变化
-        if observation.exit_code == 0:
-            new_variety = self._current_space.variety * (1.0 - constraint.expected_reduction)
-            # 成功执行也降低 epiplexity（解耦合作用）
-            new_epiplexity = self._current_space.epiplexity * (1.0 - 0.3 * constraint.expected_reduction)
+        # B: 依赖检查
+        if constraint.depends_on is not None:
+            dep_satisfied = any(
+                c.constraint_id == constraint.depends_on
+                for c in (self._trace.constraints if self._trace else [])
+            )
+            if not dep_satisfied:
+                # 依赖未满足：标记为依赖错误，epi上升
+                new_variety = self._current_space.variety * 1.3
+                new_epiplexity = min(1.0, self._current_space.epiplexity * 1.2)
+                new_space = Space(
+                    variety=round(min(1.0, new_variety), 4),
+                    epiplexity=round(new_epiplexity, 4),
+                    dimensions=self._current_space.dimensions,
+                    per_dim_variety=self._current_space.per_dim_variety.copy(),
+                    coupling_matrix=self._current_space.coupling_matrix.copy(),
+                )
+                error = new_space.distance_to(self._target_space)
+                self._trace.add_step(constraint, observation, new_space, error)
+                self._current_space = new_space
+                return new_space
+        
+        # A: 优先使用观测的实际收敛量
+        if observation.variety_reduction is not None:
+            actual_reduction = observation.variety_reduction
         else:
-            new_variety = min(1.0, self._current_space.variety * 1.2)  # 失败膨胀
-            # 失败时 epiplexity 可能上升（控制失控增加耦合）
+            actual_reduction = constraint.expected_reduction
+        
+        if observation.exit_code == 0:
+            new_variety = self._current_space.variety * (1.0 - actual_reduction)
+            new_epiplexity = self._current_space.epiplexity * (
+                1.0 - 0.3 * actual_reduction
+            )
+        else:
+            new_variety = min(1.0, self._current_space.variety * 1.2)
             new_epiplexity = min(1.0, self._current_space.epiplexity * 1.1)
         
         new_variety = max(0.01, new_variety)
