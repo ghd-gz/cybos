@@ -13,9 +13,74 @@ survey 模块将其转换为包含 Epiplexity 的 Space。
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from .space import Space
+
+
+# ─── 三段式定性 → 连续值映射器 ───
+
+
+class QualitativeMapper:
+    """三段式定性标注到连续值的确定性映射。
+    
+    LLM 在拆解任务时，对维度的不确定性和维度间耦合强度
+    做三段式定性判断（低/中/高 或 弱/中/强）比连续数值更稳定。
+    本映射器将三段式标注转换为用于 Epiplexity 计算的连续值。
+    
+    映射表初始值为经验估计，后续由归纳校准器（Calibrator）
+    根据实际控制循环收敛结果反向调整。
+    """
+
+    # 维度不确定性：低/中/高 → 连续值
+    DIMENSION_VALUES = {
+        "低": 0.25,
+        "中": 0.50,
+        "高": 0.75,
+    }
+
+    # 耦合强度：弱/中/强 → 连续值
+    COUPLING_VALUES = {
+        "弱": 0.30,
+        "中": 0.60,
+        "强": 0.90,
+    }
+
+    @classmethod
+    def map_dimension_value(cls, value: Union[str, float]) -> float:
+        """映射维度值。str → float，float 直接通过（向后兼容）。"""
+        if isinstance(value, (int, float)):
+            return max(0.0, min(1.0, float(value)))
+        if isinstance(value, str) and value in cls.DIMENSION_VALUES:
+            return cls.DIMENSION_VALUES[value]
+        # fallback: 未知字符串
+        return 0.5
+
+    @classmethod
+    def map_dimensions(cls, dimensions: Dict[str, Union[str, float]]) -> Dict[str, float]:
+        """全量映射维度的值。"""
+        return {k: cls.map_dimension_value(v) for k, v in dimensions.items()}
+
+    @classmethod
+    def map_coupling_strength(cls, strength: Union[str, float]) -> float:
+        """映射耦合强度。str → float，float 直接通过（向后兼容）。"""
+        if isinstance(strength, (int, float)):
+            return max(0.0, min(1.0, float(strength)))
+        if isinstance(strength, str) and strength in cls.COUPLING_VALUES:
+            return cls.COUPLING_VALUES[strength]
+        # fallback: 未知字符串
+        return 0.5
+
+    @classmethod
+    def map_couplings(cls, couplings: list) -> list:
+        """全量映射耦合列表。每项为 (src, tgt, str|float)。"""
+        result = []
+        for c in couplings:
+            if len(c) == 3:
+                result.append((c[0], c[1], cls.map_coupling_strength(c[2])))
+            else:
+                result.append(c)
+        return result
 
 
 # ─── 数据类型 ───
@@ -206,43 +271,47 @@ def compute_epiplexity(
 
 def survey_from_text(
     task_description: str,
-    dimensions: Dict[str, float],
-    couplings: Optional[List[Tuple[str, str, float]]] = None,
+    dimensions: Dict[str, Union[str, float]],
+    couplings: Optional[List[Tuple[str, str, Union[str, float]]]] = None,
 ) -> SurveyResult:
     """从自然语言任务的拆解结果创建 SurveyResult。
-    
-    这是 LLM 控制器的标准接口：LLM 拆解任务后，
-    用这个函数将拆解结果结构化为 SurveyResult。
-    
+
+    这是 LLM 控制器的标准接口。LLM 拆解任务后，
+    输出三段式定性标注（低/中/高 或 弱/中/强），
+    由 QualitativeMapper 映射为连续值用于计算。
+
     Args:
         task_description: 原始任务描述
-        dimensions: {维度名: per_dim_variety}
-        couplings: [(源维度, 目标维度, 强度), ...]
-    
+        dimensions: {维度名: "低"|"中"|"高"}  或 {维度名: 0.25}
+        couplings: [(源, 目标, "弱"|"中"|"强")] 或 [(源, 目标, 0.3)]
+
     Returns:
         SurveyResult（epiplexity 已计算）
     """
+    # 三段式 → 连续值映射
+    mapped_dims = QualitativeMapper.map_dimensions(dimensions)
+    mapped_couplings = QualitativeMapper.map_couplings(couplings or [])
+
     coupling_objects = []
-    if couplings:
-        for src, tgt, strength in couplings:
-            coupling_objects.append(Coupling(
-                source=src,
-                target=tgt,
-                strength=min(1.0, max(0.0, strength)),
-            ))
-    
+    for src, tgt, strength in mapped_couplings:
+        coupling_objects.append(Coupling(
+            source=src,
+            target=tgt,
+            strength=strength,
+        ))
+
     survey = SurveyResult(
         task_description=task_description,
-        dimensions=dimensions,
+        dimensions=mapped_dims,
         couplings=coupling_objects,
     )
-    
+
     # 计算 epiplexity
     estimator = EpiplexityEstimator()
     survey.epiplexity = estimator.estimate(survey)
-    
+
     # 计算 variety
-    if dimensions:
-        survey.variety = sum(dimensions.values()) / len(dimensions)
-    
+    if mapped_dims:
+        survey.variety = sum(mapped_dims.values()) / len(mapped_dims)
+
     return survey

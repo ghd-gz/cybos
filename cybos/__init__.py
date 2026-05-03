@@ -3,13 +3,13 @@
 from .space import Space, Constraint, Observation, EPIPLEXITY_ALPHA
 from .runtime import Runtime, ControlTrace
 from .agent import Agent, Skill
-from .survey import SurveyResult, EpiplexityEstimator, Coupling, survey_from_text, compute_epiplexity
+from .survey import SurveyResult, EpiplexityEstimator, Coupling, QualitativeMapper, survey_from_text, compute_epiplexity
 
 __all__ = [
     "Space", "Constraint", "Observation",
     "Runtime", "ControlTrace",
     "Agent", "Skill",
-    "SurveyResult", "EpiplexityEstimator", "Coupling",
+    "SurveyResult", "EpiplexityEstimator", "Coupling", "QualitativeMapper",
     "survey_from_text", "compute_epiplexity",
     "EPIPLEXITY_ALPHA",
     "create_session",
