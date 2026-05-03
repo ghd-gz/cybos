@@ -5,6 +5,7 @@ from .runtime import Runtime, ControlTrace
 from .agent import Agent, Skill
 from .survey import SurveyResult, EpiplexityEstimator, Coupling, QualitativeMapper, survey_from_text, compute_epiplexity
 from .session import CybosSession
+from .calibrator import Calibrator, CalibrationRecord
 
 __all__ = [
     "Space", "Constraint", "Observation",
@@ -13,6 +14,7 @@ __all__ = [
     "SurveyResult", "EpiplexityEstimator", "Coupling", "QualitativeMapper",
     "survey_from_text", "compute_epiplexity",
     "CybosSession",
+    "Calibrator", "CalibrationRecord",
     "EPIPLEXITY_ALPHA",
     "create_session",
 ]

@@ -57,4 +57,5 @@ while space.variety > epsilon:
 |---|---|---|
 | 1 | Tool Layer 标准化——带控制论元数据的工具调用协议 | ✅ 已完成 |
 | 2 | Epiplexity 估计集成——Space 交叉耦合度、Survey 子系统、升级 Ashby 定律 | ✅ 已完成 |
+| 2b | CybosSession — Hermes 环境适配器（来福手动管理控制循环） | ✅ 已完成 |
 | 3 | Agent + SOUL 深度集成 | ⏳ 待推进 |
